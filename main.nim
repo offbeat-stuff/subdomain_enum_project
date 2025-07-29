@@ -1,0 +1,65 @@
+import std/[asyncdispatch, httpclient]
+import strformat
+import json, strutils, sets
+
+proc downloadCrts(domain: string): Future[string] {.async.} =
+  var client = newAsyncHttpClient()
+  var url = fmt"https://crt.sh/?q=%25.{domain}&output=json"
+  echo "downloading ", url
+  try:
+    return await client.getContent(url)
+  finally:
+    client.close()
+
+stdout.write "Enter domain: "
+var domain = stdin.readLine().strip()
+echo "Subdomains of domain : ", domain
+let crts = waitFor downloadCrts(domain)
+echo "finished downloading"
+
+var dnsSet = initHashSet[string]()
+
+let js = parseJson(crts)
+for entry in js:
+  for possible_subdomain in splitLines(entry["name_value"].getStr()):
+    if possible_subdomain.startsWith("*"):
+      continue
+    if possible_subdomain.startsWith("www."):
+      continue
+    if possible_subdomain == domain:
+      continue
+    if possible_subdomain.endsWith("." & domain):
+      dnsSet.incl(possible_subdomain)
+
+echo "Found ", dnsSet.len(), " subdomains"
+if dnsSet.len() == 0:
+  quit("Found no subdomains", QuitSuccess)
+for entry in dnsSet:
+  echo entry
+
+import os
+
+## cache results
+proc saveResults() =
+  stdout.write "save results to file (n to skip): "
+  var resultFile = stdin.readLine().strip()
+  if fileExists(resultFile):
+    echo "file already exists, choose another file"
+    saveResults()
+    return
+  if resultFile.toLower() == "n":
+    return
+  if resultFile.isEmptyOrWhitespace():
+    return
+  var file: File
+  if not file.open(resultFile, fmWrite):
+    echo "failed to open said file, choose another file"
+    saveResults()
+    return
+  echo "opened file ", resultFile
+  for entry in dnsSet:
+    writeLine(file, entry)
+  file.close()
+  echo "saved file ", resultFile
+
+saveResults()
