@@ -2,14 +2,25 @@ import std/[asyncdispatch, httpclient]
 import strformat
 import json, strutils, sets
 
-proc downloadCrts(domain: string): Future[string] {.async.} =
+proc downloadUrl(url: string,retries: int): Future[string] {.async.} =
   var client = newAsyncHttpClient()
+  defer: client.close()
+  var tries = 0
+  var resp : AsyncResponse
+  while tries < retries:
+    tries.inc()
+    resp = await client.get(url)
+    if resp.code.is5xx:
+      continue
+    if resp.code.is4xx:
+      echo "client error"
+      return
+    return await resp.bodyStream.readAll()
+
+proc downloadCrts(domain: string): Future[string] {.async.} =
   var url = fmt"https://crt.sh/?q=%25.{domain}&output=json"
   echo "downloading ", url
-  try:
-    return await client.getContent(url)
-  finally:
-    client.close()
+  return await downloadUrl(url, 4)
 
 stdout.write "Enter domain: "
 var domain = stdin.readLine().strip()
