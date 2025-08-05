@@ -2,11 +2,12 @@ import std/[asyncdispatch, httpclient]
 import strformat
 import json, strutils, sets
 
-proc downloadUrl(url: string,retries: int): Future[string] {.async.} =
+proc downloadUrl(url: string, retries: int): Future[string] {.async.} =
   var client = newAsyncHttpClient()
-  defer: client.close()
+  defer:
+    client.close()
   var tries = 0
-  var resp : AsyncResponse
+  var resp: AsyncResponse
   while tries < retries:
     tries.inc()
     resp = await client.get(url)
