@@ -2,6 +2,10 @@ import std/[asyncdispatch, httpclient]
 import strformat
 import json, strutils, sets
 
+proc ask(prompt: string): string =
+  stdout.writeLine prompt
+  return stdin.readLine().strip()
+
 proc downloadUrl(url: string, retries: int): Future[string] {.async.} =
   var client = newAsyncHttpClient()
   defer:
@@ -23,8 +27,7 @@ proc downloadCrts(domain: string): Future[string] {.async.} =
   echo "downloading ", url
   return await downloadUrl(url, 4)
 
-stdout.write "Enter domain: "
-var domain = stdin.readLine().strip()
+var domain = ask("Enter domain: ")
 echo "Subdomains of domain : ", domain
 let crts = waitFor downloadCrts(domain)
 echo "finished downloading"
@@ -53,8 +56,7 @@ import os
 
 ## cache results
 proc saveResults() =
-  stdout.write "save results to file (n to skip): "
-  var resultFile = stdin.readLine().strip()
+  var resultFile = ask("save results to file (n to skip): ")
   if fileExists(resultFile):
     echo "file already exists, choose another file"
     saveResults()
